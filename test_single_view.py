@@ -8,10 +8,12 @@ import torch
 from scipy.ndimage import rotate
 from tqdm import tqdm
 
-import data_loader as module_data
+import data_loader as module_data_loader
+import dataset as module_dataset
 import model as module_arch
 import model.utils.metric as module_metric
 from dataset.ISBIDatasetStatic import Phase
+from dataset.dataset_utils import Evaluate
 from dataset.dataset_utils import Views
 from parse_config import ConfigParser, parse_cmd_args
 
@@ -24,16 +26,15 @@ def main(config, resume=None):
 
     resume = Path(resume).parent
     for view in list(Views):
-        data_loader = config.retrieve_class('data_loader', module_data)(
-            config['data_loader']['args']['data_dir'],
+
+        dataset = config.retrieve_class('dataset', module_dataset)(
+            **config['dataset']['args'], phase=Phase.TEST, evaluate=config['evaluate'], view=view
+        )
+        data_loader = config.retrieve_class('data_loader', module_data_loader)(
+            dataset=dataset,
             batch_size=config['data_loader']['args']['batch_size'],
-            shuffle=False,
-            phase=Phase.TEST,
-            modalities=config['data_loader']['args']['modalities'],
             num_workers=config['data_loader']['args']['num_workers'],
-            evaluate=config['evaluate'],
-            preprocess=config['data_loader']['args']['preprocess'],
-            view=view
+            shuffle=False
         )
         resume_path = os.path.join(resume, view.name, 'model_best.pth')
         if os.path.exists(resume_path):
@@ -125,7 +126,7 @@ def evaluate_model(config, data_loader, logger, resume, view):
                         logger.info(f'Done with patient {int(patient) + 1}:')
                         timestep = 0
                         patient += 1
-                        if config["evaluate"] == 'test':
+                        if config["evaluate"] == Evaluate.TEST:
                             if patient == 1 or patient == 10 or patient == 13:
                                 timestep_limit = 5
                                 logger.info(f'There exist {timestep_limit} timesteps for Patient {int(patient) + 1}')
@@ -134,7 +135,7 @@ def evaluate_model(config, data_loader, logger, resume, view):
                                 logger.info(f'There exist {timestep_limit} timesteps for Patient {int(patient) + 1}')
                             else:
                                 timestep_limit = 4
-                        elif config["evaluate"] == 'training':
+                        elif config["evaluate"] == Evaluate.TRAINING:
                             if patient == 2:
                                 timestep_limit = 5
                                 logger.info(f'There exist {timestep_limit} timesteps for Patient {int(patient) + 1}')
@@ -161,7 +162,7 @@ if __name__ == '__main__':
     args.add_argument('-c', '--config', default=None, type=str, help='config file path (default: None)')
     args.add_argument('-r', '--resume', default=None, type=str, help='path to latest checkpoint (default: None)')
     args.add_argument('-d', '--device', default=None, type=str, help='indices of GPUs to enable (default: all)')
-    args.add_argument('-e', '--evaluate', default='training', type=str, help='Either "training" or "test"; Determines the prefix of the folders to use')
+    args.add_argument('-e', '--evaluate', default=Evaluate.TEST, type=Evaluate, help='Either "training" or "test"; Determines the prefix of the folders to use')
 
     config = ConfigParser(*parse_cmd_args(args))
     main(config)

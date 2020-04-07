@@ -2,22 +2,22 @@
 
 This is the code for our paper Spatio-temporal Learning from Longitudinal Data for Multiple Sclerosis Lesion Segmentation which can be found [here](link)
 
-If you want to use any of our code please cite:
+If you use any of our code, please cite:
 
 ... 
 
 <!-- @import "[TOC]" {cmd="toc" depthFrom=1 depthTo=6 orderedList=false} -->
 
 <!-- code_chunk_output -->
-
-* [Requirements](#requirements)
-* [Folder Structure](#folder-structure)
-* [Usage](#usage)
-    * [Train](#train)
-    * [Resuming from checkpoints](#resuming-from-checkpoints)
-    * [Test](#test)
-* [License](#license)
-* [Acknowledgements](#acknowledgements)
+* [Spatio-temporal Learning from Longitudinal Data for Multiple Sclerosis Lesion Segmentation](#spatio-temporal-learning-from-longitudinal-data-for-multiple-sclerosis-lesion-segmentation)
+    * [Requirements](#requirements)
+    * [Folder Structure](#folder-structure)
+    * [Usage](#usage)
+        * [Train](#train)
+        * [Resuming from checkpoints](#resuming-from-checkpoints)
+        * [Test](#test)
+    * [License](#license)
+    * [Acknowledgements](#acknowledgements)
 
 <!-- /code_chunk_output -->
 

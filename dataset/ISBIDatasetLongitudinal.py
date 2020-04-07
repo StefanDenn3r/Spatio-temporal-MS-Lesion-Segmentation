@@ -6,15 +6,15 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset
 
-from dataset.dataset_utils import Phase, Modalities, Mode, retrieve_data_dir_paths
+from dataset.dataset_utils import Phase, Modalities, Mode, retrieve_data_dir_paths, Evaluate
 
 
 class ISBIDatasetLongitudinal(Dataset):
     """ISBIDatasetLongitudinal dataset"""
 
-    def __init__(self, data_dir, phase=Phase.TRAIN, modalities=[], validation_patient=None, evaluate='test', preprocess=False, view=None):
+    def __init__(self, data_dir, phase=Phase.TRAIN, modalities=(), val_patient=None, evaluate: Evaluate = Evaluate.TRAINING, preprocess=False, view=None):
         self.modalities = list(map(lambda x: Modalities(x), modalities))
-        self.data_dir_paths = retrieve_data_dir_paths(data_dir, evaluate, phase, preprocess, validation_patient, Mode.LONGITUDINAL, view)
+        self.data_dir_paths = retrieve_data_dir_paths(data_dir, evaluate, phase, preprocess, val_patient, Mode.LONGITUDINAL, view)
 
     def __len__(self):
         return len(self.data_dir_paths)

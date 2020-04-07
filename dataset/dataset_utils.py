@@ -34,7 +34,12 @@ class Mode(Enum):
     LONGITUDINAL = 'longitudinal'
 
 
-def retrieve_data_dir_paths(data_dir, evaluate, phase, preprocess, validation_patient, mode, view=None):
+class Evaluate(Enum):
+    TRAINING = 'training'
+    TEST = 'TEST'
+
+
+def retrieve_data_dir_paths(data_dir, evaluate: Evaluate, phase, preprocess, val_patient, mode, view=None):
     empty_slices = None
     non_positive_slices = None
     if preprocess:
@@ -49,11 +54,11 @@ def retrieve_data_dir_paths(data_dir, evaluate, phase, preprocess, validation_pa
     _data_dir_paths = []
     patient_keys = [key for key in data_dir_paths.keys()]
     if phase == Phase.TRAIN:
-        patient_keys.remove(patient_keys[validation_patient])
+        patient_keys.remove(patient_keys[val_patient])
         for patient in patient_keys:
             _data_dir_paths += data_dir_paths[patient]
     elif phase == Phase.VAL:
-        _data_dir_paths += data_dir_paths[patient_keys[validation_patient]]
+        _data_dir_paths += data_dir_paths[patient_keys[val_patient]]
     elif phase == Phase.TEST:
         for patient in patient_keys:
             _data_dir_paths += data_dir_paths[patient]
@@ -67,12 +72,12 @@ def retrieve_data_dir_paths(data_dir, evaluate, phase, preprocess, validation_pa
         _data_dir_paths = list(filter(lambda path: int(path.split(os.sep)[-2]) == view.value, _data_dir_paths))
     if phase == Phase.TRAIN or phase == Phase.VAL:
         _data_dir_paths = retrieve_filtered_data_dir_paths(data_dir, phase, _data_dir_paths, empty_slices, non_positive_slices,
-                                                           mode, validation_patient, view)
+                                                           mode, val_patient, view)
     return _data_dir_paths
 
 
 def preprocess_files(root_dir, phase, evaluate, base_path='data'):
-    patients = list(filter(lambda name: (evaluate if phase == Phase.TEST else 'training') in name, os.listdir(root_dir)))
+    patients = list(filter(lambda name: (evaluate.value if phase == Phase.TEST else Evaluate.TRAINING.value) in name, os.listdir(root_dir)))
     empty_slices = []
     non_positive_slices = []
     i_patients = len(patients) + 1
@@ -193,12 +198,12 @@ def retrieve_paths_longitudinal(patient_paths):
 
 def get_patient_paths(data_dir, evaluate, phase):
     patient_paths = map(lambda name: os.path.join(name, 'data'),
-                        (filter(lambda name: (evaluate if phase == Phase.TEST else 'training') in name,
+                        (filter(lambda name: (evaluate.value if phase == Phase.TEST else Evaluate.TRAINING.value) in name,
                                 glob(os.path.join(data_dir, '*')))))
     return patient_paths
 
 
-def retrieve_filtered_data_dir_paths(root_dir, phase, data_dir_paths, empty_slices, non_positive_slices, mode, validation_patient, view: Views = None):
+def retrieve_filtered_data_dir_paths(root_dir, phase, data_dir_paths, empty_slices, non_positive_slices, mode, val_patient, view: Views = None):
     empty_file_path = os.path.join(root_dir, 'empty_slices.pckl')
     non_positive_slices_path = os.path.join(root_dir, 'non_positive_slices.pckl')
 
@@ -207,7 +212,7 @@ def retrieve_filtered_data_dir_paths(root_dir, phase, data_dir_paths, empty_slic
     if non_positive_slices:
         pickle.dump(non_positive_slices, open(non_positive_slices_path, 'wb'))
 
-    data_dir_path = os.path.join(root_dir, f'data_dir_{mode.value}_{phase.value}_{validation_patient}{f"_{view.name}" if view else ""}.pckl')
+    data_dir_path = os.path.join(root_dir, f'data_dir_{mode.value}_{phase.value}_{val_patient}{f"_{view.name}" if view else ""}.pckl')
     if os.path.exists(data_dir_path):
         # means it has been preprocessed before -> directly load data_dir_paths
         data_dir_paths = pickle.load(open(data_dir_path, 'rb'))

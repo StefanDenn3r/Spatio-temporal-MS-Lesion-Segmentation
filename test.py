@@ -12,6 +12,7 @@ import dataset as module_dataset
 import model as module_arch
 import model.utils.metric as module_metric
 from dataset.ISBIDatasetStatic import Phase
+from dataset.dataset_utils import Evaluate
 from parse_config import ConfigParser, parse_cmd_args
 
 
@@ -23,12 +24,13 @@ def main(config, resume=None):
 
     # setup data_loader instances
     dataset = config.retrieve_class('dataset', module_dataset)(
-        **config['dataset']['args'], phase=Phase.TEST
+        **config['dataset']['args'], phase=Phase.TEST, evaluate=config['evaluate']
     )
     data_loader = config.retrieve_class('data_loader', module_data_loader)(
-        **config['data_loader']['args'],
         dataset=dataset,
-        shuffle=False,
+        batch_size=config['data_loader']['args']['batch_size'],
+        num_workers=config['data_loader']['args']['num_workers'],
+        shuffle=False
     )
 
     # build model architecture
@@ -74,13 +76,13 @@ def main(config, resume=None):
             if len(loaded_data) == 2:
                 inner_timestep_limit = 1
                 # static case
-                data, target = loaded_data[0], loaded_data[1]
+                data, target = loaded_data
                 data, target = data.to(device), target.to(device)
                 output = model(data)
             else:
                 # longitudinal case
                 inner_timestep_limit = timestep_limit - 1
-                x_ref, x, target = loaded_data[0], loaded_data[1], loaded_data[2]
+                x_ref, x, _, target = loaded_data
                 x_ref, x, target = x_ref.to(device), x.to(device), target.to(device)
                 output = model(x_ref, x)
                 if isinstance(output, tuple):
@@ -99,7 +101,7 @@ def main(config, resume=None):
                     axis += 1
                     if not axis % 3 and axis > 0:
                         path = os.path.join(config.config['trainer']['save_dir'], 'output', *str(config._save_dir).split(os.sep)[-2:],
-                                            resume.split(os.sep)[-1][:-4])
+                                            str(resume).split(os.sep)[-1][:-4])
                         os.makedirs(path, exist_ok=True)
 
                         if avg_seg_volume is None:
@@ -127,7 +129,7 @@ def main(config, resume=None):
                                 patient_metrics = torch.zeros(len(metric_fns))
                                 timestep = 0
                                 patient += 1
-                                if config["evaluate"] == 'test':
+                                if config["evaluate"] == Evaluate.TEST:
                                     if patient == 1 or patient == 10 or patient == 13:
                                         timestep_limit = 5
                                         logger.info(f'There exist {timestep_limit} timesteps for Patient {int(patient) + 1}')
@@ -136,7 +138,7 @@ def main(config, resume=None):
                                         logger.info(f'There exist {timestep_limit} timesteps for Patient {int(patient) + 1}')
                                     else:
                                         timestep_limit = 4
-                                elif config["evaluate"] == 'training':
+                                elif config["evaluate"] == Evaluate.TRAINING:
                                     if patient == 2:
                                         timestep_limit = 5
                                         logger.info(f'There exist {timestep_limit} timesteps for Patient {int(patient) + 1}')
@@ -152,14 +154,14 @@ def main(config, resume=None):
         logger.info(f'      {met.__name__}: {total_metrics[i].item() / n_samples}')
 
 
-def evaluate_timestep(output_dict, target_dict, metric_fns, config, path, patient, patient_metrics, total_metrics, timestep, logger):
+def evaluate_timestep(avg_seg_volume, target_agg, metric_fns, config, path, patient, patient_metrics, total_metrics, timestep, logger):
     prefix = f'{config["evaluate"]}{(int(patient) + 1):02}_{int(timestep) + 1:02}'
-    seg_volume = np.round(output_dict).astype('int8')
+    seg_volume = torch.round(avg_seg_volume).int().cpu().detach().numpy()
     rotated_seg_volume = rotate(rotate(seg_volume, 90, axes=(0, 1)), -90, axes=(1, 2))
     cropped_seg_volume = rotated_seg_volume[18:-18, :, 18:-18]
     nibabel.save(nibabel.Nifti1Image(cropped_seg_volume, np.eye(4)), os.path.join(path, f'{prefix}_seg.nii'))
 
-    target_volume = torch.squeeze(target_dict).int().cpu().detach().numpy()
+    target_volume = torch.squeeze(target_agg).int().cpu().detach().numpy()
     rotated_target_volume = rotate(rotate(target_volume, 90, axes=(0, 1)), -90, axes=(1, 2))
     cropped_target_volume = rotated_target_volume[18:-18, :, 18:-18]
     nibabel.save(nibabel.Nifti1Image(cropped_target_volume, np.eye(4)), os.path.join(path, f'{prefix}_target.nii.gz'))
@@ -187,8 +189,7 @@ def get_avg_seg_volume(output_dict):
     # Some explanations for the following line:
     # for axis_volumes we only used the predictions for the 1 label. By building the mean over all values up and rounding this we get the value 1
     # for those where the label 1 has the majority in softmax space, else 0. This exactly corresponds to our prediction as we would have taken argmax.
-    seg_volume = axis_volumes.mean(dim=0).cpu().detach().numpy()
-    return seg_volume
+    return torch.unsqueeze(axis_volumes.mean(dim=0), dim=0)
 
 
 if __name__ == '__main__':
@@ -196,7 +197,6 @@ if __name__ == '__main__':
     args.add_argument('-c', '--config', default=None, type=str, help='config file path (default: None)')
     args.add_argument('-r', '--resume', default=None, type=str, help='path to latest checkpoint (default: None)')
     args.add_argument('-d', '--device', default=None, type=str, help='indices of GPUs to enable (default: all)')
-    args.add_argument('-e', '--evaluate', default='test', type=str, help='Either "training" or "test"; Determines the prefix of the folders to use')
-
+    args.add_argument('-e', '--evaluate', default=Evaluate.TEST, type=Evaluate, help='Either "training" or "test"; Determines the prefix of the folders to use')
     config = ConfigParser(*parse_cmd_args(args))
     main(config)

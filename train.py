@@ -45,12 +45,11 @@ def main(config, resume=None):
         train(logger, config, loss, metrics)
 
 
-def train(logger, config, loss, metrics, validation_patient=4, view: Views = None):
-    dataset = config.retrieve_class('dataset', module_dataset)(**config['dataset']['args'], phase=Phase.TRAIN, validation_patient=validation_patient, view=view)
+def train(logger, config, loss, metrics, val_patient=4, view: Views = None):
+    dataset = config.retrieve_class('dataset', module_dataset)(**config['dataset']['args'], phase=Phase.TRAIN, val_patient=val_patient, view=view)
     data_loader = config.retrieve_class('data_loader', module_data_loader)(**config['data_loader']['args'], dataset=dataset)
 
-    val_dataset = config.retrieve_class('dataset', module_dataset)(**config['dataset']['args'], phase=Phase.VAL, validation_patient=validation_patient,
-                                                                   view=view)
+    val_dataset = config.retrieve_class('dataset', module_dataset)(**config['dataset']['args'], phase=Phase.VAL, val_patient=val_patient, view=view)
     valid_data_loader = config.retrieve_class('data_loader', module_data_loader)(**config['data_loader']['args'], dataset=val_dataset)
 
     # build model architecture, then print to console
@@ -76,7 +75,6 @@ if __name__ == '__main__':
     args.add_argument('-c', '--config', default=None, type=str, help='config file path (default: None)')
     args.add_argument('-r', '--resume', default=None, type=str, help='path to latest checkpoint (default: None)')
     args.add_argument('-d', '--device', default=None, type=str, help='indices of GPUs to enable (default: all)')
-    args.add_argument('-e', '--evaluate', default='training', type=str, help='Either "training" or "test"; Determines the prefix of the folders to use')
     args.add_argument('-s', '--single_view', default=False, type=bool, help='Defines if a single is used per plane orientation')
 
     config = ConfigParser(*parse_cmd_args(args))
