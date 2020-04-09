@@ -1,9 +1,16 @@
 # Spatio-temporal Learning from Longitudinal Data for Multiple Sclerosis Lesion Segmentation
 
-This is the code for our paper Spatio-temporal Learning from Longitudinal Data for Multiple Sclerosis Lesion Segmentation which can be found [here](link)
+This is the code for our paper Spatio-temporal Learning from Longitudinal Data for Multiple Sclerosis Lesion Segmentation which can be found [here](https://arxiv.org/pdf/2004.03675.pdf)
 
 If you use any of our code, please cite:
-
+```
+@article{Denner2020,
+   author = {Denner, Stefan and Khakzar, Ashkan and Sajid, Moiz and Saleh, Mahdi and Spiclin, Ziga and Kim, Seong Tae and Navab, Nassir},
+   title = {Spatio-temporal Learning from Longitudinal Data for Multiple Sclerosis Lesion Segmentation},
+   url = {http://arxiv.org/abs/2004.03675},
+   year = {2020}
+}
+```
 ... 
 
 <!-- @import "[TOC]" {cmd="toc" depthFrom=1 depthTo=6 orderedList=false} -->
@@ -16,6 +23,7 @@ If you use any of our code, please cite:
         * [Train](#train)
         * [Resuming from checkpoints](#resuming-from-checkpoints)
         * [Test](#test)
+    * [Disclaimer](#disclaimer)
     * [License](#license)
     * [Acknowledgements](#acknowledgements)
 
@@ -113,6 +121,8 @@ test script has an argument `-e` or `--evaluate` which can be either `train` or 
 This argument specifies which data should be used. For evaluating the performance of the model on the 
 train/validation set, this argument has to be `train` else `test`(default).
 
+## Disclaimer
+The code has been cleaned and polished for the sake of clarity and reproducibility, and even though it has been checked thoroughly, it might contain bugs or mistakes. Please do not hesitate to open an issue or contact the authors to inform of any problem you may find within this repository.
 
 ## License
 This project is licensed under the MIT License. See LICENSE for more details
