@@ -10,8 +10,7 @@ If you use any of our code, please cite:
    url = {http://arxiv.org/abs/2004.03675},
    year = {2020}
 }
-```
-... 
+``` 
 
 <!-- @import "[TOC]" {cmd="toc" depthFrom=1 depthTo=6 orderedList=false} -->
 
@@ -38,7 +37,7 @@ If you use any of our code, please cite:
 
 ## Folder Structure
   ```
-  pytorch-template/
+  Spatio-temporal-MS-Lesion-Segmentation/
   │
   ├── train.py - main script to start/resume training
   ├── test.py - evaluation of trained model
