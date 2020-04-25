@@ -31,7 +31,7 @@ If you use any of our code, please cite:
 ## Requirements
 * Python >= 3.5 (3.6 recommended)
 * PyTorch = 1.4 
-* tqdm (Optional for `test.py`)
+* tqdm
 * tensorboard >= 1.14 
 * nibabel >= 2.5
 
@@ -47,29 +47,28 @@ If you use any of our code, please cite:
   │  
   ├── configs/ - holds all the configurations files for the different models
   │   ├── Longitudinal_Network.py
-  │   ├── Longitudinal_Network_with_Pretraining_Finetune.py
-  │   ├── Longitudinal_Network_with_Pretraining_Pretrain.py
   │   ├── Longitudinal_Siamese_Network.py
   │   ├── Multitask_Longitudinal_Network.py
+  │   ├── Deep_Atlas.py
   │   ├── Static_Network.py
+  │   ├── Static_Network_Asymmetric.py
   │   └── Static_Network_Zhang.py
   │
   ├── data_loader/
-  │   └── ISBIDataloader.py - dataloader for the ISBI Dataset
+  │   └── Dataloader.py - dataloader for the Dataset
   │
   ├── model/
-  │   ├── utils/ - holds additional Modules, losses and metrics
+  │   ├── utils/ - contains additional Modules, losses and metrics
   │   ├── FCDenseNet.py
   │   ├── LongitudinalFCDenseNet.py
   │   ├── MultitaskNetwork.py.py
-  │   └── Voxelmorph2DTransfer.py
+  │   └── DeepAtlas.py
   │
   └── trainer/ - trainers
-      ├── ISBITrainer.py
-      ├── LongitudinalDeformationTrainer.py
+      ├── Trainer.py
       ├── LongitudinalMultitaskTrainer.py
       ├── LongitudinalTrainer.py
-      ├── LongitudinalTrainerFinetune.py
+      ├── DeepAtlasTrainer.py
       └── StaticTrainer.py
 
   ```
@@ -82,15 +81,14 @@ Before the models can be trained or tested, the paths in the config files (locat
 ### Train
 To run the experiments from our paper the following table specifies the commands to run:
 
-| Network                                   | Command                                                              |
-|-------------------------------------------|----------------------------------------------------------------------|
-| Multitask Longitudinal Network            | python train.py -c Multitask_Longitudinal_Network.py                 |
-| Longitudinal Network with Pretraining     | python train.py -c Longitudinal_Network_with_Pretraining_Pretrain.py |
-| Longitudinal Network                      | python train.py -c Longitudinal_Network.py                           |
-| Static Network                            | python train.py -c Static_Network.py                                 |
-| Longitudinal Siamese Network              | python train.py -c Longitudinal_Siamese_Network.py                   |
-| Static Network (Zhang et al. [2])         | python train.py -c Static_Network_Zhang.py -s True                   |
-| Static Network (Single plane orientation) | python train.py -c Static_Network.py -s True                         |
+| Network                                      | Command                                                           |
+|----------------------------------------------|-------------------------------------------------------------------|
+| Multitask Longitudinal Network               | python train.py -c Multitask_Longitudinal_Network.py              |
+| Baseline Longitudinal Network                | python train.py -c Longitudinal_Network.py                        |
+| Baseline Static Network                      | python train.py -c Static_Network.py                              |
+| Longitudinal Siamese Network                 | python train.py -c Longitudinal_Siamese_Network.py                |
+| Static Network (Zhang et al. [2])            | python train.py -c Static_Network_Zhang.py -s True                |
+| Static Network (Asymmetric Dice Loss [12])   | python train.py -c Static_Network_Asymmetric.py                   |
 
 
 ### Resuming from checkpoints
@@ -109,7 +107,7 @@ For testing a **longitudinal** model we perform a majority vote over all possibl
 A longitudinal model usually has a reference image(timepoint t-1) and the target/follow-up image(timepoint t) as input. 
 Our experiments have shown that we achieve the best performance when applying a majority vote over all possible permutations for a certain target image. 
 This means, for a patient with four timesteps t ∈ {0; 1; 2; 3} and having t = 1 as the target image, we do 
-a majority votes over the outputs of the inputs (reference, target): (0, 1), (2, 1), (3, 1).
+a majority votes over the probability outputs of the inputs (reference, target): (0, 1), (2, 1), (3, 1).
 
 ### General notes
 All hyperparameters are defined in the config file.

@@ -45,3 +45,17 @@ def dice_loss(output, target):
 
 def asymmetric_loss(output, target):
     return metric_utils.asymmetric_loss(2, output, target)
+
+
+def deep_atlas_loss(
+        y_seg_moving, y_seg_fixed, y_deformation, y_seg_deformation, flow,
+        target_moving, target_fixed, input_fixed
+):
+    seg_moving_loss = mse(y_seg_moving, target_moving)
+    seg_fixed_loss = mse(y_seg_fixed, target_fixed)
+    seg_deformation_loss = mse(y_seg_deformation, target_fixed)
+    recon_loss = mse(y_deformation, input_fixed)
+    grad_loss = 0.01 * gradient_loss(flow)
+    loss = seg_moving_loss + seg_fixed_loss + seg_deformation_loss + recon_loss + grad_loss
+
+    return loss

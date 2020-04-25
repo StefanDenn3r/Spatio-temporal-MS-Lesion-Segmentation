@@ -5,23 +5,24 @@ CONFIG = {
     "n_gpu": 1,
 
     "arch": {
-        "type": "Voxelmorph2DTransfer",
+        "type": "DeepAtlas",
         "args": {
-            "mode": "seg"
+            "in_channels": 2
         }
     },
     "dataset": {
-        "type": "ISBIDatasetLongitudinal",
+        "type": "DatasetLongitudinal",
         "args": {
             "data_dir": "../ISBIMSlesionChallenge/",
             "preprocess": True,
-            "modalities": ['flair', 'mprage', 'pd', 't2']
+            "modalities": ['flair'],
+            "val_patients": [4]
         }
     },
     "data_loader": {
-        "type": "ISBIDataloader",
+        "type": "Dataloader",
         "args": {
-            "batch_size": 2,
+            "batch_size": 4,
             "shuffle": True,
             "num_workers": 4,
         }
@@ -34,7 +35,7 @@ CONFIG = {
             "amsgrad": True
         }
     },
-    "loss": "mse",
+    "loss": "deep_atlas_loss",
     "metrics": [
         "precision", "recall", "dice_loss", "dice_score", "asymmetric_loss"
     ],
@@ -46,17 +47,13 @@ CONFIG = {
         }
     },
     "trainer": {
-        "type": "LongitudinalTrainerFinetune",
-        "epochs": 200,
+        "type": "DeepAtlasTrainer",
+        "epochs": 100,
         "save_dir": "../saved/",
         "save_period": 1,
         "verbosity": 2,
-        "monitor": "min val_loss",
+        "monitor": "min val_dice_loss",
         "early_stop": 10,
-        "tensorboard": True,
-        "args": {
-            "start_finetuning": True,
-            "only_load_encoder": False
-        }
+        "tensorboard": True
     }
 }

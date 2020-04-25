@@ -2,9 +2,9 @@ from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch.utils.data.dataloader import default_collate
 
 
-class ISBIDataloader(DataLoader):
+class Dataloader(DataLoader):
     """
-    ISBI data loading
+    Data loading
     """
 
     def __init__(self, dataset, batch_size, shuffle=True, num_workers=1):

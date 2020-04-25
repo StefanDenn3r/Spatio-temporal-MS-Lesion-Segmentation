@@ -1,5 +1,11 @@
 import importlib
 from datetime import datetime
+from enum import Enum
+
+
+class Mode(Enum):
+    TRAIN = 'Train'
+    VAL = 'Val'
 
 
 class TensorboardWriter():
@@ -28,7 +34,7 @@ class TensorboardWriter():
                 logger.warning(message)
 
         self.step = 0
-        self.mode = ''
+        self.mode = None
 
         self.tb_writer_ftns = {
             'add_scalar', 'add_scalars', 'add_image', 'add_images', 'add_audio', 'add_graph',
@@ -37,7 +43,7 @@ class TensorboardWriter():
         self.tag_mode_exceptions = {'add_graph', 'add_histogram', 'add_embedding'}
         self.timer = datetime.now()
 
-    def set_step(self, step, mode='train'):
+    def set_step(self, step, mode=Mode.TRAIN):
         self.mode = mode
         self.step = step
         if step == 0:
@@ -61,7 +67,7 @@ class TensorboardWriter():
                 if add_data is not None:
                     # add mode(train/valid) tag
                     if name not in self.tag_mode_exceptions:
-                        tag = '{}/{}'.format(tag, self.mode)
+                        tag = '{}/{}'.format(tag, self.mode.value)
                     add_data(tag, data, self.step, *args, **kwargs)
 
             return wrapper

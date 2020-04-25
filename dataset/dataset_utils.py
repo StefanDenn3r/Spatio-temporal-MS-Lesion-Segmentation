@@ -15,6 +15,7 @@ class Modalities(Enum):
     MPRAGE = 'mprage'
     PD = 'pd'
     T2 = 't2'
+    T1W = 't1w'
 
 
 class Phase(Enum):
@@ -34,12 +35,17 @@ class Mode(Enum):
     LONGITUDINAL = 'longitudinal'
 
 
+class Dataset(Enum):
+    ISBI = 'isbi'
+    INHOUSE = 'inhouse'
+
+
 class Evaluate(Enum):
     TRAINING = 'training'
-    TEST = 'TEST'
+    TEST = 'test'
 
 
-def retrieve_data_dir_paths(data_dir, evaluate: Evaluate, phase, preprocess, val_patient, mode, view=None):
+def retrieve_data_dir_paths(data_dir, evaluate: Evaluate, phase, preprocess, val_patients, mode, view=None):
     empty_slices = None
     non_positive_slices = None
     if preprocess:
@@ -54,25 +60,23 @@ def retrieve_data_dir_paths(data_dir, evaluate: Evaluate, phase, preprocess, val
     _data_dir_paths = []
     patient_keys = [key for key in data_dir_paths.keys()]
     if phase == Phase.TRAIN:
-        patient_keys.remove(patient_keys[val_patient])
+        for val_patient in val_patients[::-1]:
+            patient_keys.remove(patient_keys[val_patient])
+
         for patient in patient_keys:
             _data_dir_paths += data_dir_paths[patient]
     elif phase == Phase.VAL:
-        _data_dir_paths += data_dir_paths[patient_keys[val_patient]]
-    elif phase == Phase.TEST:
-        for patient in patient_keys:
-            _data_dir_paths += data_dir_paths[patient]
+        for val_patient in val_patients:
+            _data_dir_paths += data_dir_paths[patient_keys[val_patient]]
     else:
         for patient in patient_keys:
-            _data_dir_paths += sorted(data_dir_paths[patient])
-
-        pickle.dump(_data_dir_paths, open(os.path.join(data_dir, f'data_dir_{mode.value}_{phase}_{evaluate}.pckl'), 'wb'))
+            _data_dir_paths += data_dir_paths[patient]
 
     if view:
         _data_dir_paths = list(filter(lambda path: int(path.split(os.sep)[-2]) == view.value, _data_dir_paths))
     if phase == Phase.TRAIN or phase == Phase.VAL:
         _data_dir_paths = retrieve_filtered_data_dir_paths(data_dir, phase, _data_dir_paths, empty_slices, non_positive_slices,
-                                                           mode, val_patient, view)
+                                                           mode, val_patients, view)
     return _data_dir_paths
 
 
@@ -101,7 +105,7 @@ def preprocess_files(root_dir, phase, evaluate, base_path='data'):
                 if os.path.exists(label_path):
                     rotated_labels = transform_data(label_path)
                 else:
-                    rotated_labels = np.zeros((217, 217, 217))
+                    rotated_labels = np.zeros(normalized_data.shape)
 
                 # create slices through all views
                 temp_empty_slices, temp_non_positive_slices = create_slices(normalized_data, rotated_labels,
@@ -115,9 +119,23 @@ def preprocess_files(root_dir, phase, evaluate, base_path='data'):
 
 def transform_data(data_path):
     data = nib.load(data_path).get_data()
-    padded_data = np.pad(data, ((18, 18), (0, 0), (18, 18)), 'constant')
+    x_dim, y_dim, z_dim = data.shape
+    max_dim = max(x_dim, y_dim, z_dim)
+    x_pad = get_padding(max_dim, x_dim)
+    y_pad = get_padding(max_dim, y_dim)
+    z_pad = get_padding(max_dim, z_dim)
+    padded_data = np.pad(data, (x_pad, y_pad, z_pad), 'constant')
     rotated_data = scipy.ndimage.rotate(scipy.ndimage.rotate(padded_data, 90, axes=(1, 2)), -90, axes=(0, 1))
     return rotated_data
+
+
+def get_padding(max_dim, current_dim):
+    diff = max_dim - current_dim
+    pad = diff // 2
+    if diff % 2 == 0:
+        return pad, pad
+    else:
+        return pad, pad + 1
 
 
 def create_slices(data, label, timestep_path, modality):
@@ -148,20 +166,16 @@ def create_slices(data, label, timestep_path, modality):
 
 def retrieve_paths_static(patient_paths):
     data_dir_paths = defaultdict(list)
-    nested_data_dir_paths = {}
     for patient_path in patient_paths:
         if not os.path.isdir(patient_path):
             continue
         patient = patient_path.split(os.sep)[-2]
-        nested_data_dir_paths[patient] = {}
         for timestep in filter(lambda x: os.path.isdir(os.path.join(patient_path, x)), os.listdir(patient_path)):
             timestep_path = os.path.join(patient_path, timestep)
-            nested_data_dir_paths[patient][timestep] = {}
-            for axis in filter(lambda x: os.path.isdir(os.path.join(patient_path, x)), os.listdir(timestep_path)):
+            for axis in filter(lambda x: os.path.isdir(os.path.join(timestep_path, x)), os.listdir(timestep_path)):
                 axis_path = os.path.join(timestep_path, axis)
                 slice_paths = filter(lambda x: os.path.isdir(x), map(lambda x: os.path.join(axis_path, x), os.listdir(axis_path)))
                 data_dir_paths[patient] += slice_paths
-                nested_data_dir_paths[patient][timestep][Views(int(axis)).name] = slice_paths
 
     return data_dir_paths
 
@@ -203,7 +217,7 @@ def get_patient_paths(data_dir, evaluate, phase):
     return patient_paths
 
 
-def retrieve_filtered_data_dir_paths(root_dir, phase, data_dir_paths, empty_slices, non_positive_slices, mode, val_patient, view: Views = None):
+def retrieve_filtered_data_dir_paths(root_dir, phase, data_dir_paths, empty_slices, non_positive_slices, mode, val_patients, view: Views = None):
     empty_file_path = os.path.join(root_dir, 'empty_slices.pckl')
     non_positive_slices_path = os.path.join(root_dir, 'non_positive_slices.pckl')
 
@@ -212,7 +226,7 @@ def retrieve_filtered_data_dir_paths(root_dir, phase, data_dir_paths, empty_slic
     if non_positive_slices:
         pickle.dump(non_positive_slices, open(non_positive_slices_path, 'wb'))
 
-    data_dir_path = os.path.join(root_dir, f'data_dir_{mode.value}_{phase.value}_{val_patient}{f"_{view.name}" if view else ""}.pckl')
+    data_dir_path = os.path.join(root_dir, f'data_dir_{mode.value}_{phase.value}_{val_patients}{f"_{view.name}" if view else ""}.pckl')
     if os.path.exists(data_dir_path):
         # means it has been preprocessed before -> directly load data_dir_paths
         data_dir_paths = pickle.load(open(data_dir_path, 'rb'))

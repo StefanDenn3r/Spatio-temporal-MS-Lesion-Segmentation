@@ -1,4 +1,5 @@
 import json
+import pprint
 from collections import OrderedDict
 from itertools import repeat
 from pathlib import Path
@@ -8,7 +9,7 @@ import pandas as pd
 
 def write_config(content, fname):
     with fname.open('wt') as handle:
-        handle.write("CONFIG = " + str(content))
+        handle.write("CONFIG = " + pprint.pformat(content))
         handle.close()
 
 

@@ -12,15 +12,16 @@ CONFIG = {
         }
     },
     "dataset": {
-        "type": "ISBIDatasetLongitudinal",
+        "type": "DatasetLongitudinal",
         "args": {
             "data_dir": "../ISBIMSlesionChallenge/",
             "preprocess": True,
-            "modalities": ['flair', 'mprage', 'pd', 't2']
+            "modalities": ['flair', 'mprage', 'pd', 't2'],
+            "val_patients": [4]
         }
     },
     "data_loader": {
-        "type": "ISBIDataloader",
+        "type": "Dataloader",
         "args": {
             "batch_size": 4,
             "shuffle": True,
@@ -52,7 +53,7 @@ CONFIG = {
         "save_dir": "../saved/",
         "save_period": 1,
         "verbosity": 2,
-        "monitor": "min val_loss",
+        "monitor": "min val_dice_loss",
         "early_stop": 10,
         "tensorboard": True
     }

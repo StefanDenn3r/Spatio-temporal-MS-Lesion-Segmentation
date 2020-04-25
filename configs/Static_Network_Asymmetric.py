@@ -5,21 +5,22 @@ CONFIG = {
     "n_gpu": 1,
 
     "arch": {
-        "type": "Voxelmorph2DTransfer",
+        "type": "FCDenseNet",
         "args": {
-            "mode": "warp"
+            "in_channels": 4  # 1  # 4
         }
     },
     "dataset": {
-        "type": "ISBIDatasetLongitudinal",
+        "type": "DatasetStatic",
         "args": {
             "data_dir": "../ISBIMSlesionChallenge/",
             "preprocess": True,
-            "modalities": ['flair', 'mprage', 'pd', 't2']
+            "modalities": ['flair', 'mprage', 'pd', 't2'],
+            "val_patients": [4]
         }
     },
     "data_loader": {
-        "type": "ISBIDataloader",
+        "type": "Dataloader",
         "args": {
             "batch_size": 2,
             "shuffle": True,
@@ -34,8 +35,10 @@ CONFIG = {
             "amsgrad": True
         }
     },
-    "loss": "deformation_loss",
-    "metrics": [],
+    "loss": "asymmetric_loss",
+    "metrics": [
+        "precision", "recall", "dice_loss", "dice_score", "asymmetric_loss"
+    ],
     "lr_scheduler": {
         "type": "StepLR",
         "args": {
@@ -44,12 +47,12 @@ CONFIG = {
         }
     },
     "trainer": {
-        "type": "LongitudinalDeformationTrainer",
-        "epochs": 200,
+        "type": "StaticTrainer",
+        "epochs": 100,
         "save_dir": "../saved/",
         "save_period": 1,
         "verbosity": 2,
-        "monitor": "min val_loss",
+        "monitor": "min val_dice_loss",
         "early_stop": 10,
         "tensorboard": True
     }

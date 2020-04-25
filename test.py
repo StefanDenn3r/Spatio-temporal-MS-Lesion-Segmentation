@@ -11,8 +11,8 @@ import data_loader as module_data_loader
 import dataset as module_dataset
 import model as module_arch
 import model.utils.metric as module_metric
-from dataset.ISBIDatasetStatic import Phase
-from dataset.dataset_utils import Evaluate
+from dataset.DatasetStatic import Phase
+from dataset.dataset_utils import Evaluate, Dataset
 from parse_config import ConfigParser, parse_cmd_args
 
 
@@ -54,7 +54,8 @@ def main(config, resume=None):
     model = model.to(device)
     model.eval()
 
-    timestep_limit = 4
+    timestep_limit = 4 if config['dataset_type'] == Dataset.ISBI else 2
+    res = 217 if config['dataset_type'] == Dataset.ISBI else 229
 
     total_metrics = torch.zeros(len(metric_fns))
     patient_metrics = torch.zeros(len(metric_fns))
@@ -66,10 +67,11 @@ def main(config, resume=None):
         timestep = 0  # max 3
         axis = 0  # max 2
         c = 0
+        data_shape = [res, res, res]
 
-        output_agg = torch.zeros([3, 217, 217, 217]).to(device)
+        output_agg = torch.zeros([3, *data_shape]).to(device)
         avg_seg_volume = None
-        target_agg = torch.zeros([217, 217, 217]).to(device)
+        target_agg = torch.zeros(data_shape).to(device)
 
         n_samples = 0
         for idx, loaded_data in enumerate(tqdm(data_loader)):
@@ -90,14 +92,14 @@ def main(config, resume=None):
 
             for slice_output, slice_target in zip(output, target):
                 # we only deal with binary data. Storing only prob for label 1 is enough because of softmax normalization: P(0) = 1 - P(1)
-                output_agg[axis][c % 217] = torch.unsqueeze(slice_output.float()[1], dim=0)
+                output_agg[axis][c % res] = torch.unsqueeze(slice_output.float()[1], dim=0)
 
                 if axis == 0 and inner_timestep == 0:
-                    target_agg[c % 217] = torch.argmax(slice_target.float(), dim=0)
+                    target_agg[c % res] = torch.argmax(slice_target.float(), dim=0)
 
                 c += 1
 
-                if not c % 217 and c > 0:
+                if not c % res and c > 0:
                     axis += 1
                     if not axis % 3 and axis > 0:
                         path = os.path.join(config.config['trainer']['save_dir'], 'output', *str(config._save_dir).split(os.sep)[-2:],
@@ -105,9 +107,9 @@ def main(config, resume=None):
                         os.makedirs(path, exist_ok=True)
 
                         if avg_seg_volume is None:
-                            avg_seg_volume = get_avg_seg_volume(output_agg)
+                            avg_seg_volume = get_avg_seg_volume(output_agg, data_shape)
                         else:
-                            avg_seg_volume = torch.cat([avg_seg_volume, get_avg_seg_volume(output_agg)], dim=0)
+                            avg_seg_volume = torch.cat([avg_seg_volume, get_avg_seg_volume(output_agg, data_shape)], dim=0)
 
                         axis = 0
                         inner_timestep += 1
@@ -129,21 +131,8 @@ def main(config, resume=None):
                                 patient_metrics = torch.zeros(len(metric_fns))
                                 timestep = 0
                                 patient += 1
-                                if config["evaluate"] == Evaluate.TEST:
-                                    if patient == 1 or patient == 10 or patient == 13:
-                                        timestep_limit = 5
-                                        logger.info(f'There exist {timestep_limit} timesteps for Patient {int(patient) + 1}')
-                                    elif patient == 9:
-                                        timestep_limit = 6
-                                        logger.info(f'There exist {timestep_limit} timesteps for Patient {int(patient) + 1}')
-                                    else:
-                                        timestep_limit = 4
-                                elif config["evaluate"] == Evaluate.TRAINING:
-                                    if patient == 2:
-                                        timestep_limit = 5
-                                        logger.info(f'There exist {timestep_limit} timesteps for Patient {int(patient) + 1}')
-                                    else:
-                                        timestep_limit = 4
+                                timestep_limit = get_timestep_limit(config['evaluate'], patient, config['dataset_type'])
+                                logger.info(f'There exist {timestep_limit} timesteps for Patient {int(patient) + 1}')
 
                             inner_timestep = 0
                             avg_seg_volume = None
@@ -155,7 +144,7 @@ def main(config, resume=None):
 
 
 def evaluate_timestep(avg_seg_volume, target_agg, metric_fns, config, path, patient, patient_metrics, total_metrics, timestep, logger):
-    prefix = f'{config["evaluate"]}{(int(patient) + 1):02}_{int(timestep) + 1:02}'
+    prefix = f'{config["evaluate"].value}{(int(patient) + 1):02}_{int(timestep) + 1:02}'
     seg_volume = torch.round(avg_seg_volume).int().cpu().detach().numpy()
     rotated_seg_volume = rotate(rotate(seg_volume, 90, axes=(0, 1)), -90, axes=(1, 2))
     cropped_seg_volume = rotated_seg_volume[18:-18, :, 18:-18]
@@ -174,8 +163,8 @@ def evaluate_timestep(avg_seg_volume, target_agg, metric_fns, config, path, pati
         total_metrics[i] += current_metric
 
 
-def get_avg_seg_volume(output_dict):
-    axis_volumes = torch.zeros([3, 217, 217, 217])
+def get_avg_seg_volume(output_dict, data_shape):
+    axis_volumes = torch.zeros([3, *data_shape])
     for i in range(len(output_dict)):
         axis_volume = torch.squeeze(output_dict[i])
         if i == 1:
@@ -192,11 +181,45 @@ def get_avg_seg_volume(output_dict):
     return torch.unsqueeze(axis_volumes.mean(dim=0), dim=0)
 
 
+def get_timestep_limit(evaluate, patient, dataset):
+    if dataset == Dataset.ISBI:
+        timestep_limit = 4
+        if evaluate == Evaluate.TEST:
+            if patient == 1 or patient == 10 or patient == 13:
+                timestep_limit = 5
+            elif patient == 9:
+                timestep_limit = 6
+            else:
+                timestep_limit = 4
+        elif evaluate == Evaluate.TRAINING:
+            if patient == 2:
+                timestep_limit = 5
+            else:
+                timestep_limit = 4
+    elif dataset == Dataset.INHOUSE:
+        timestep_limit = 2
+        if evaluate == Evaluate.TEST:
+            if patient == 40 or patient == 87 or patient == 100 or patient == 110:
+                timestep_limit = 3
+            elif patient == 122:
+                timestep_limit = 4
+            else:
+                timestep_limit = 2
+        elif evaluate == Evaluate.TRAINING:
+            if patient == 27:
+                timestep_limit = 3
+    else:
+        raise ValueError(f'Invalid dataset type given: {dataset}')
+
+    return timestep_limit
+
+
 if __name__ == '__main__':
     args = argparse.ArgumentParser(description='PyTorch Template')
     args.add_argument('-c', '--config', default=None, type=str, help='config file path (default: None)')
     args.add_argument('-r', '--resume', default=None, type=str, help='path to latest checkpoint (default: None)')
     args.add_argument('-d', '--device', default=None, type=str, help='indices of GPUs to enable (default: all)')
     args.add_argument('-e', '--evaluate', default=Evaluate.TEST, type=Evaluate, help='Either "training" or "test"; Determines the prefix of the folders to use')
+    args.add_argument('-m', '--dataset_type', default=Dataset.ISBI, type=Dataset, help='Dataset to use')
     config = ConfigParser(*parse_cmd_args(args))
     main(config)

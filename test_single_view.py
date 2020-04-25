@@ -12,10 +12,10 @@ import data_loader as module_data_loader
 import dataset as module_dataset
 import model as module_arch
 import model.utils.metric as module_metric
-from dataset.ISBIDatasetStatic import Phase
-from dataset.dataset_utils import Evaluate
-from dataset.dataset_utils import Views
+from dataset.DatasetStatic import Phase
+from dataset.dataset_utils import Evaluate, Dataset, Views
 from parse_config import ConfigParser, parse_cmd_args
+from test import get_timestep_limit
 
 
 def main(config, resume=None):
@@ -104,7 +104,9 @@ def evaluate_model(config, data_loader, logger, resume, view):
         c = 0
         output_list = []
         n_samples = 0
-        timestep_limit = 4
+        timestep_limit = 4 if config['dataset_type'] == Dataset.ISBI else 2
+        res = 217 if config['dataset_type'] == Dataset.ISBI else 229
+
         for i, (data, target) in enumerate(tqdm(data_loader)):
             data, target = data.to(device), target.to(device)
             output = model(data)
@@ -113,7 +115,7 @@ def evaluate_model(config, data_loader, logger, resume, view):
                 output_list.append(np.expand_dims(slice_output.cpu().detach().float()[1], axis=0))
                 c += 1
 
-                if not c % 217 and c > 0:
+                if not c % res and c > 0:
                     n_samples += 1
                     path = os.path.join(config.config['trainer']['save_dir'], 'output', *str(config._save_dir).split('/')[-2:])
                     evaluate_timestep(output_list, path, patient, timestep, logger, view, config)
@@ -126,27 +128,14 @@ def evaluate_model(config, data_loader, logger, resume, view):
                         logger.info(f'Done with patient {int(patient) + 1}:')
                         timestep = 0
                         patient += 1
-                        if config["evaluate"] == Evaluate.TEST:
-                            if patient == 1 or patient == 10 or patient == 13:
-                                timestep_limit = 5
-                                logger.info(f'There exist {timestep_limit} timesteps for Patient {int(patient) + 1}')
-                            elif patient == 9:
-                                timestep_limit = 6
-                                logger.info(f'There exist {timestep_limit} timesteps for Patient {int(patient) + 1}')
-                            else:
-                                timestep_limit = 4
-                        elif config["evaluate"] == Evaluate.TRAINING:
-                            if patient == 2:
-                                timestep_limit = 5
-                                logger.info(f'There exist {timestep_limit} timesteps for Patient {int(patient) + 1}')
-                            else:
-                                timestep_limit = 4
+                        timestep_limit = get_timestep_limit(config['evaluate'], patient, config['dataset_type'])
+                        logger.info(f'There exist {timestep_limit} timesteps for Patient {int(patient) + 1}')
 
                     output_list = []
 
 
 def evaluate_timestep(output_list, path, patient, timestep, logger, view, config):
-    sub_path = os.path.join(path, f'{config["evaluate"]}{(int(patient) + 1):02}', f'{int(timestep) + 1:02}')
+    sub_path = os.path.join(path, f'{config["evaluate"].value}{(int(patient) + 1):02}', f'{int(timestep) + 1:02}')
     os.makedirs(sub_path, exist_ok=True)
 
     seg_volume = np.moveaxis(np.squeeze(np.asarray(output_list)), 0, int(view.value))
@@ -163,6 +152,6 @@ if __name__ == '__main__':
     args.add_argument('-r', '--resume', default=None, type=str, help='path to latest checkpoint (default: None)')
     args.add_argument('-d', '--device', default=None, type=str, help='indices of GPUs to enable (default: all)')
     args.add_argument('-e', '--evaluate', default=Evaluate.TEST, type=Evaluate, help='Either "training" or "test"; Determines the prefix of the folders to use')
-
+    args.add_argument('-m', '--dataset_type', default=Dataset.ISBI, type=Dataset, help='Dataset to use')
     config = ConfigParser(*parse_cmd_args(args))
     main(config)
